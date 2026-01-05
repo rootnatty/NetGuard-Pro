@@ -27,6 +27,7 @@ To install NetGuard Pro, simply copy and paste the following command into your t
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/rootnatty/NetGuard-Pro/refs/heads/main/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/rootnatty/NetGuard-Pro/refs/heads/main/install.sh | sudo bash && netguard-health
 
 ```
 
@@ -57,4 +58,13 @@ You might want to add a "Subsystems Map" so users understand what files they are
 | /usr/local/bin/netguard-applet | The UI Monitor (Python) |
 | /etc/netguard/safelist.conf | Your "Sunderland" (Trusted) IPs |
 | /var/log/netguard/ | Daily HTML Reports & Audit Logs |
+
+
+
+ POST-DEPLOY TESTS:
+bash
+netguard-health                    # 4/4 green checks
+netguard-applet &                  # Tray appears instantly
+echo "BLOCK 1.2.3.4" | nc -U /run/netguard/control.fifo  # Logs [BLOCK]
+tail -f /var/log/netguard/audit.log # Confirm action logged
 
