@@ -2,12 +2,13 @@
 # ==============================================================================
 # 🛡️ NetGuard Pro v6.1 (Enterprise Interactive Edition - Hardened)
 # Architecture: Root Daemon + Socket API + Interactive User Notifications
+# Compatibility: Supports legacy AppIndicator and modern Ayatana libraries
 # ==============================================================================
 set -euo pipefail
 
 # --- Styling & Root Check ---
 BOLD=$(tput bold 2>/dev/null || echo ""); RESET=$(tput sgr0 2>/dev/null || echo "")
-GREEN='\u001B[0;32m'; CYAN='\u001B[0;36m'; RED='\u001B[0;31m'; YELLOW='\u001B[1;33m'
+GREEN='\033[0;32m'; CYAN='\033[0;36m'; RED='\033[0;31m'; YELLOW='\033[1;33m'
 
 [[ $EUID -ne 0 ]] && { echo -e "${RED}Error: Run as root.${RESET}"; exit 1; }
 
@@ -16,9 +17,17 @@ REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 
 echo -e "${CYAN}${BOLD}🚀 Deploying NetGuard Pro v6.1 Enterprise (Hardened)...${RESET}"
 
-# 1. DEPENDENCIES
+# 1. SMART DEPENDENCY DETECTION (Fixes "no installation candidate" error)
+echo -e "📦 Resolving system dependencies..."
 apt update -qq >/dev/null
-apt install -y curl ipset ufw python3 python3-gi gir1.2-appindicator3-0.1 \
+
+if apt-cache show gir1.2-ayatanaappindicator3-0.1 >/dev/null 2>&1; then
+    APP_IND="gir1.2-ayatanaappindicator3-0.1"
+else
+    APP_IND="gir1.2-appindicator3-0.1"
+fi
+
+apt install -y curl ipset ufw python3 python3-gi "$APP_IND" \
                gir1.2-notify-0.7 sqlite3 netcat-openbsd geoip-bin libnotify-bin >/dev/null
 
 # 2. PERMISSIONS & DIRECTORIES
@@ -27,14 +36,14 @@ groupadd -f netguard-admin && usermod -aG netguard-admin "$REAL_USER"
 chown root:netguard-admin /run/netguard /var/log/netguard
 chmod 775 /run/netguard /var/log/netguard
 
-# 3. BACKEND DAEMON: The Guardian (Hardened)
+# 3. BACKEND DAEMON: The Guardian (Root Managed)
 cat << 'EOF' > /usr/local/bin/netguard-core
 #!/bin/bash
 SOCKET="/run/netguard/control.sock"
 LOG="/var/log/netguard/audit.log"
 
 validate_ip() {
-    [[ $1 =~ ^([0-9]{1,3}.){3}[0-9]{1,3}$ ]] || return 1
+    [[ $1 =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
     IFS='.' read -r -a o <<< "$1"
     [[ ${o[0]} -le 255 && ${o[1]} -le 255 && ${o[2]} -le 255 && ${o[3]} -le 255 ]]
 }
@@ -82,14 +91,22 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-# 5. INTERACTIVE APPLET (Secure Version)
+# 5. INTERACTIVE APPLET (Distro-Aware & Non-Root)
 cat << 'EOF' > /usr/local/bin/netguard-applet
 #!/usr/bin/env python3
 import gi, subprocess, os
 gi.require_version('Gtk', '3.0')
-gi.require_version('AppIndicator3', '0.1')
+
+# Smart Import for Legacy vs Ayatana
+try:
+    gi.require_version('AyatanaAppIndicator3', '0.1')
+    from gi.repository import AyatanaAppIndicator3 as AppIndicator3
+except (ImportError, ValueError):
+    gi.require_version('AppIndicator3', '0.1')
+    from gi.repository import AppIndicator3
+
 gi.require_version('Notify', '0.7')
-from gi.repository import Gtk, AppIndicator3, GLib, Notify
+from gi.repository import Gtk, GLib, Notify
 
 SOCKET = "/run/netguard/control.sock"
 THREAT_COUNTRIES = ["Russia", "China", "North Korea"]
@@ -127,7 +144,7 @@ class NetGuardUI:
 
     def refresh(self, *args):
         self.menu.foreach(self.menu.remove)
-        raw = subprocess.getoutput("ss -tun state established | awk 'NR>1 {split($5,a,":"); print a[1]}' | sort -u")
+        raw = subprocess.getoutput("ss -tun state established | awk 'NR>1 {split($5,a,\":\"); print a[1]}' | sort -u")
         for ip in raw.splitlines():
             if ip and ip not in self.known_ips:
                 country = subprocess.getoutput(f"geoiplookup {ip} | cut -d: -f2").strip()
@@ -162,6 +179,5 @@ Icon=network-transmit-receive
 EOF
 chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.config/autostart/netguard.desktop"
 
-echo -e "
-${GREEN}${BOLD}🏰 NETGUARD PRO v6.1 HARDENED BUILD DEPLOYED!${RESET}"
-echo -e "${CYAN}Interactive Notifications Enabled. Click 'Block' to instantly secure your system.${RESET}"
+echo -e "\n${GREEN}${BOLD}🏰 NETGUARD PRO v6.1 HARDENED BUILD DEPLOYED!${RESET}"
+echo -e "${CYAN}Interactive Notifications Enabled. Logic configured for your specific OS version.${RESET}"
