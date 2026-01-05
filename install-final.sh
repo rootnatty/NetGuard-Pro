@@ -1,26 +1,29 @@
 #!/bin/bash
 # ==============================================================================
 # 🛡️ NetGuard Pro v6.1 (Enterprise Interactive Edition - Hardened)
-# Architecture: Root Daemon + Socket API + Interactive User Notifications
-# Compatibility: Supports legacy AppIndicator and modern Ayatana libraries
+# Final Polished Build: Handles Duplicate Repos & Distro-Specific Dependencies
 # ==============================================================================
 set -euo pipefail
 
-# --- Styling & Root Check ---
 BOLD=$(tput bold 2>/dev/null || echo ""); RESET=$(tput sgr0 2>/dev/null || echo "")
-GREEN='\033[0;32m'; CYAN='\033[0;36m'; RED='\033[0;31m'; YELLOW='\033[1;33m'
+GREEN='\033[0;32m'; CYAN='\033[0;36m'; RED='\033[0;31m'
 
 [[ $EUID -ne 0 ]] && { echo -e "${RED}Error: Run as root.${RESET}"; exit 1; }
 
 REAL_USER=${SUDO_USER:-$USER}
 REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 
-echo -e "${CYAN}${BOLD}🚀 Deploying NetGuard Pro v6.1 Enterprise (Hardened)...${RESET}"
+echo -e "${CYAN}${BOLD}🚀 Starting NetGuard Pro v6.1 Final Deployment...${RESET}"
 
-# 1. SMART DEPENDENCY DETECTION (Fixes "no installation candidate" error)
-echo -e "📦 Resolving system dependencies..."
+# 1. REPOSITORY CLEANUP (Fixes the "Target configured multiple times" warnings)
+echo -e "🧹 Cleaning up duplicate APT sources..."
+sed -i 'N;/^\(.*\)\n\1$/!P;D' /etc/apt/sources.list
+
+# 2. SMART DEPENDENCY RESOLUTION
+echo -e "📦 Installing hardened dependencies..."
 apt update -qq >/dev/null
 
+# Detect modern vs legacy indicator libraries
 if apt-cache show gir1.2-ayatanaappindicator3-0.1 >/dev/null 2>&1; then
     APP_IND="gir1.2-ayatanaappindicator3-0.1"
 else
@@ -30,13 +33,13 @@ fi
 apt install -y curl ipset ufw python3 python3-gi "$APP_IND" \
                gir1.2-notify-0.7 sqlite3 netcat-openbsd geoip-bin libnotify-bin >/dev/null
 
-# 2. PERMISSIONS & DIRECTORIES
+# 3. DIRECTORY SETUP
 mkdir -p /etc/netguard /var/lib/netguard /var/log/netguard /run/netguard /var/cache/netguard
 groupadd -f netguard-admin && usermod -aG netguard-admin "$REAL_USER"
 chown root:netguard-admin /run/netguard /var/log/netguard
 chmod 775 /run/netguard /var/log/netguard
 
-# 3. BACKEND DAEMON: The Guardian (Root Managed)
+# 4. DEPLOY COMPONENT: BACKEND DAEMON
 cat << 'EOF' > /usr/local/bin/netguard-core
 #!/bin/bash
 SOCKET="/run/netguard/control.sock"
@@ -50,7 +53,6 @@ validate_ip() {
 
 rm -f "$SOCKET"
 while true; do
-    # Non-blocking listener with timeout to prevent hang
     cmd=$(timeout 1 nc -Ul "$SOCKET" || true)
     [[ -z "$cmd" ]] && continue
     action=$(echo "$cmd" | cut -d' ' -f1)
@@ -76,7 +78,7 @@ done
 EOF
 chmod 755 /usr/local/bin/netguard-core
 
-# 4. SYSTEMD SERVICE
+# 5. DEPLOY COMPONENT: SYSTEMD SERVICE
 cat << EOF > /etc/systemd/system/netguard.service
 [Unit]
 Description=NetGuard Pro Enterprise Backend
@@ -91,13 +93,11 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-# 5. INTERACTIVE APPLET (Distro-Aware & Non-Root)
+# 6. DEPLOY COMPONENT: INTERACTIVE APPLET
 cat << 'EOF' > /usr/local/bin/netguard-applet
 #!/usr/bin/env python3
 import gi, subprocess, os
 gi.require_version('Gtk', '3.0')
-
-# Smart Import for Legacy vs Ayatana
 try:
     gi.require_version('AyatanaAppIndicator3', '0.1')
     from gi.repository import AyatanaAppIndicator3 as AppIndicator3
@@ -114,27 +114,18 @@ THREAT_COUNTRIES = ["Russia", "China", "North Korea"]
 class NetGuardUI:
     def __init__(self):
         Notify.init("NetGuard Pro")
-        self.ind = AppIndicator3.Indicator.new(
-            "netguard", "network-transmit-receive",
-            AppIndicator3.IndicatorCategory.SYSTEM_SERVICES
-        )
+        self.ind = AppIndicator3.Indicator.new("netguard", "network-transmit-receive", AppIndicator3.IndicatorCategory.SYSTEM_SERVICES)
         self.ind.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
-        self.menu = Gtk.Menu()
-        self.ind.set_menu(self.menu)
+        self.menu = Gtk.Menu(); self.ind.set_menu(self.menu)
         self.known_ips = set()
-        self.refresh()
-        GLib.timeout_add_seconds(10, self.refresh)
+        self.refresh(); GLib.timeout_add_seconds(10, self.refresh)
 
     def send_to_socket(self, action, ip):
         payload = f"{action} {ip}".encode()
         subprocess.run(["nc", "-U", SOCKET], input=payload, check=False)
 
     def trigger_notification(self, ip, country):
-        n = Notify.Notification.new(
-            "🛡️ NetGuard: Threat Detected",
-            f"Connection from {ip} ({country})",
-            "network-error"
-        )
+        n = Notify.Notification.new("🛡️ NetGuard: Threat Detected", f"Connection from {ip} ({country})", "network-error")
         n.set_urgency(Notify.Urgency.CRITICAL)
         n.add_action("block", "Block IP", self.on_notification_click, ip)
         n.show()
@@ -151,21 +142,17 @@ class NetGuardUI:
                 if any(c in country for c in THREAT_COUNTRIES):
                     self.trigger_notification(ip, country)
                 self.known_ips.add(ip)
-            
-            mi = Gtk.MenuItem(label=f"🟢 {ip}")
-            mi.connect("activate", lambda w, i=ip: self.send_to_socket("BLOCK", i))
+            mi = Gtk.MenuItem(label=f"🟢 {ip}"); mi.connect("activate", lambda w, i=ip: self.send_to_socket("BLOCK", i))
             self.menu.append(mi)
-        
         q = Gtk.MenuItem(label="Exit"); q.connect("activate", Gtk.main_quit); self.menu.append(q)
-        self.menu.show_all()
-        return True
+        self.menu.show_all(); return True
 
 if __name__ == "__main__":
     NetGuardUI(); Gtk.main()
 EOF
 chmod 755 /usr/local/bin/netguard-applet
 
-# 6. AUTOSTART & ACTIVATION
+# 7. ACTIVATION
 systemctl daemon-reload && systemctl enable --now netguard
 ipset create netguard_blacklist hash:ip 2>/dev/null || true
 
@@ -179,5 +166,4 @@ Icon=network-transmit-receive
 EOF
 chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.config/autostart/netguard.desktop"
 
-echo -e "\n${GREEN}${BOLD}🏰 NETGUARD PRO v6.1 HARDENED BUILD DEPLOYED!${RESET}"
-echo -e "${CYAN}Interactive Notifications Enabled. Logic configured for your specific OS version.${RESET}"
+echo -e "\n${GREEN}${BOLD}🏰 NETGUARD PRO v6.1 HARDENED BUILD FULLY DEPLOYED!${RESET}"
