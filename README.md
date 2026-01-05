@@ -77,3 +77,43 @@ ipset list netguard_blacklist | grep 1.2.3.4
 ufw status | grep 1.2.3.4
 tail /var/log/netguard/audit.log
 
+
+Quick Management Commands
+text
+netguard-health          # Status check (FIFO, service, IPSet, UFW)
+netguard-applet          # Launch tray manually (should autostart)
+sudo systemctl status netguard  # Daemon status
+tail -f /var/log/netguard/audit.log  # Live audit log
+
++-------------+
+Tray Applet Features (Right-click system tray icon)
+🔴 LIVE CONNECTIONS: Shows active external IPs with country flags, BLOCK/WHOIS options
+
+🚫 BLOCKED IPS: Lists blocked IPs with UNBLOCK option
+
+📋 View Audit Logs: Opens live log viewer
+
+🗑️ CLEAR ALL: Flushes all blocks
+
+Power Commands
+bash
+# Block IP
+echo "BLOCK 1.2.3.4" | sudo tee /run/netguard/control.fifo
+
+# Unblock IP  
+echo "UNBLOCK 1.2.3.4" | sudo tee /run/netguard/control.fifo
+
+# Clear everything
+echo "CLEAR" | sudo tee /run/netguard/control.fifo
+
+# Check blocked count
+ipset list netguard_blacklist 2>/dev/null | grep -c '^[0-9]' || echo 0
+Persistence & Recovery
+Systemd: Auto-restarts daemon (sudo systemctl restart netguard)
+
+Autostart: GUI launches on login via ~/.config/autostart/netguard.desktop
+
+UFW Rules: Tagged "NetGuard-Pro" for easy identification (sudo ufw status numbered)
+
+This is production-ready! The dual ipset+UFW approach ensures blocks survive reboots and service restarts.
+
