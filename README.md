@@ -27,3 +27,34 @@ To install NetGuard Pro, simply copy and paste the following command into your t
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/rootnatty/NetGuard-Pro/refs/heads/main/install.sh | sudo bash
+
+```
+
+Upgrading to v6.3 LTS and above 
+If you are moving from an older version of NetGuard, a "Clean Upgrade" is mandatory to ensure the new log rotation and signal handling are configured correctly.
+1. Run the Uninstaller Ensure no legacy processes or orphaned pipes remain:
+`sudo bash uninstall.sh`
+Post-Installation Verification
+After the installation completes, verify that the kernel-level blocking (ipset), the firewall (ufw), and the control pipe (FIFO) are synced and operational.
+Run the Health Check:
+`sudo netguard-health --repair`
+
+Note: The --repair flag will automatically fix missing directories or misconfigured permissions discovered during the scan.
+🧪 Testing the "Sack" (Block) Functionality
+To ensure the system is working, you can perform a safe test:
+
+* Open the UI: /usr/local/bin/netguard-applet &
+ * Find a non-critical connection in the list.
+ * Select 🛑 BLOCK IP.
+ * Verify the block in the audit log:
+   tail -f /var/log/netguard/audit.log
+
+💡 Pro-Tip for your README
+You might want to add a "Subsystems Map" so users understand what files they are touching. You can add this table to your "Filesystem" section:
+| Path | Purpose |
+|---|---|
+| /usr/local/bin/netguard-core | The backend "Sack" engine (Bash) |
+| /usr/local/bin/netguard-applet | The UI Monitor (Python) |
+| /etc/netguard/safelist.conf | Your "Sunderland" (Trusted) IPs |
+| /var/log/netguard/ | Daily HTML Reports & Audit Logs |
+
