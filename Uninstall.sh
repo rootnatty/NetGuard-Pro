@@ -1,37 +1,61 @@
 #!/bin/bash
-# NetGuard Pro v5.4 → v6.3 LTS UPGRADE CLEANER
-# Complete wipe for seamless upgrade
-[[ $EUID -ne 0 ]] && { echo "🛑 Run as root"; exit 1; }
+# ==============================================================================
+# 🛡️ NetGuard Pro v6.3 LTS - ULTIMATE UNINSTALLER / SYSTEM PURGE
+# ==============================================================================
+set -euo pipefail
 
-echo -e "\n🧹 ${YELLOW}NetGuard Pro v5.4 Complete Cleanup...${RESET}"
+BOLD=$(tput bold 2>/dev/null || echo ""); RESET=$(tput sgr0 2>/dev/null || echo "")
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'
 
-# 1. STOP ALL SERVICES
-pkill -f netguard-applet.py 2>/dev/null || true
-pkill -f netguard-scan 2>/dev/null || true
+[[ $EUID -ne 0 ]] && { echo -e "${RED}❌ Run as root (sudo)${RESET}"; exit 1; }
 
-# 2. SYSTEMD (v6.3 prep)
-systemctl disable --now netguard netguard-report.timer netguard-report.service 2>/dev/null || true
-systemctl daemon-reload
+echo -e "${CYAN}${BOLD}🗑️  Starting NetGuard Pro Total Removal...${RESET}"
 
-# 3. CRON (v5.4)
-(crontab -l 2>/dev/null | grep -v netguard || true) | crontab - 2>/dev/null || true
+# 1. STOP SERVICES
+echo -e "🛑 Stopping services and processes..."
+systemctl stop netguard >/dev/null 2>&1 || true
+systemctl disable netguard >/dev/null 2>&1 || true
+pkill -f netguard >/dev/null 2>&1 || true
+sleep 2 
+echo -e "  ${GREEN}✅ Services stopped${RESET}"
 
-# 4. IPSET CLEANUP
-ipset destroy netguard_blacklist 2>/dev/null || true
+# 2. CLEAN FIREWALL (UFW & IPSet) 
+echo -e "🔥 Cleaning firewall rules..."
+ufw status numbered | grep "NetGuard-Pro" | awk -F"[][]" '{print $2}' | sort -rn | while read -r line; do
+    [ -n "$line" ] && ufw --force delete "$line" >/dev/null 2>&1
+done
+ipset destroy netguard_blacklist >/dev/null 2>&1 || true
+ufw reload >/dev/null 2>&1
+echo -e "  ${GREEN}✅ Firewall cleaned${RESET}"
 
-# 5. COMPLETE FILE REMOVAL (v5.4)
+# 3. REMOVE BINARIES & SCRIPTS
+echo -e "📂 Removing binaries..."
 rm -f /usr/local/bin/netguard-*
-rm -f "$HOME/.local/bin/netguard-applet.py" 2>/dev/null || true
-rm -f "$HOME/.config/autostart/netguard.desktop" 2>/dev/null || true
+echo -e "  ${GREEN}✅ Scripts removed${RESET}"
 
-# 6. CONFIG & DATA (Safe wipe - keeps whitelist if desired)
-rm -rf /etc/netguard /var/lib/netguard /var/log/netguard /var/run/netguard \
-       /etc/logrotate.d/netguard 2>/dev/null || true
+# 4. PURGE SYSTEM CONFIGS
+echo -e "⚙️  Purging system configurations..."
+rm -f /etc/systemd/system/netguard.service
+rm -f /etc/logrotate.d/netguard
+systemctl daemon-reload
+systemctl reset-failed
+echo -e "  ${GREEN}✅ System configs removed${RESET}"
 
-# 7. UFW CLEANUP
-ufw status numbered 2>/dev/null | grep -i netguard | awk -F"[][]" '{print $2}' | sort -rn | \
-while read idx; do [[ "$idx" =~ ^[0-9]+$ ]] && ufw --force delete "$idx"; done 2>/dev/null || true
+# 5. DELETE DATA & LOGS
+echo -e "📊 Deleting logs and pipes..."
+rm -rf /etc/netguard /var/log/netguard /run/netguard
+echo -e "  ${GREEN}✅ Data purged${RESET}"
 
-echo -e "${GREEN}✅ v5.4 Completely Removed${RESET}"
-echo -e "${CYAN}🚀 Ready for v6.3 LTS install${RESET}"
-echo -e "${YELLOW}💡 Run: sudo bash v6.3-install.sh${RESET}"
+# 6. USER ENVIRONMENT CLEANUP
+echo -e "👤 Cleaning user environment..."
+find /home -path "*/.config/autostart/netguard.desktop" -delete 2>/dev/null || true
+echo -e "  ${GREEN}✅ Environment cleaned${RESET}"
+
+# 7. FINAL VERIFICATION
+echo -e "\n🔍 Final verification..."
+systemctl is-active netguard >/dev/null 2>&1 && echo -e "${RED}⚠️  Service still active${RESET}" || echo -e "  ${GREEN}✅ Service gone${RESET}"
+[ -f /usr/local/bin/netguard-core ] && echo -e "${RED}⚠️  Binary remains${RESET}" || echo -e "  ${GREEN}✅ Binaries gone${RESET}"
+[ -p /run/netguard/control.fifo ] && echo -e "${RED}⚠️  Pipe remains${RESET}" || echo -e "  ${GREEN}✅ Pipe gone${RESET}"
+
+echo -e "\n${YELLOW}${BOLD}✨ NetGuard Pro v6.3 LTS completely removed!${RESET}"
+echo -e "${CYAN}💡 UFW is still active. Check: sudo ufw status verbose${RESET}"
