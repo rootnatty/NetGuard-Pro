@@ -68,3 +68,12 @@ netguard-applet &                  # Tray appears instantly
 echo "BLOCK 1.2.3.4" | nc -U /run/netguard/control.fifo  # Logs [BLOCK]
 tail -f /var/log/netguard/audit.log # Confirm action logged
 
+
+# ✅ CORRECT - Direct file write to FIFO
+echo "BLOCK 1.2.3.4" > /run/netguard/control.fifo
+
+# ✅ Verify block worked
+ipset list netguard_blacklist | grep 1.2.3.4
+ufw status | grep 1.2.3.4
+tail /var/log/netguard/audit.log
+
