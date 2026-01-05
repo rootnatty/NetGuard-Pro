@@ -1,119 +1,84 @@
-# NetGuard-Pro
-# 🛡️ NetGuard Pro: UFW + Bandwidth Real-time Security
+```markdown
+# 🛡️ NetGuard Pro v6.3 LTS
+**Real-time Network Defense Suite for Debian/Ubuntu**
 
-**NetGuard Pro** is a powerful, visual, and lightweight network defense suite for Debian-based Linux desktops. It integrates with **UFW (Uncomplicated Firewall)** to provide real-time monitoring of active connections, identifies high-risk IPs, displays live bandwidth usage, and allows one-click blocking directly from your system tray.
+[![Status](https://img.shields.io/badge/status-production-green.svg)]() [![Version](https://img.shields.io/badge/version-6.3_LTS-blue.svg)]() [![License](https://img.shields.io/badge/license-MIT-yellow.svg)]()
 
-This project transforms your desktop into a "Security War Room," providing immediate, actionable insights into your network traffic.
+**NetGuard Pro** transforms your desktop into a Security Operations Center with live connection monitoring, one-click IP blocking, and visual threat intelligence - all from your system tray.
 
 ## ✨ Features
 
-* **🌐 Live Connection Monitoring**: See all active outbound connections.
-* **🚦 Threat Intelligence**: Automatically flags `MALICIOUS` (🔴) IPs using FireHOL and `HIGH RISK` (🟠) countries (e.g., RU, CN, KP) using GeoIP.
-* **📈 Real-time Bandwidth**: Displays current Download (RX) and Upload (TX) speed for each connection in KB/MB.
-* **🚫 One-Click UFW Blocking**: Instantly block suspicious IPs directly from the tray menu using `pkexec` for secure privilege escalation.
-* **✅ One-Click UFW Unblocking**: Easily release blocked IPs from the tray menu.
-* **🔥 One-Click Global Reset**: Clear all NetGuard-created UFW rules with a single click.
-* **📄 Whitelisting**: Define trusted IPs that should never be flagged or blocked.
-* **📊 Visual Dashboard**: A command-line "war room" (`netguard-dash`) showing recent alerts, blocks, and active UFW rules.
-* **🔔 Desktop Notifications**: Critical alerts for malicious or high-risk connections.
-* **🔄 Automatic Updates**: Malicious IP database is updated on each install.
-* **🚀 Auto-Start**: The tray applet launches automatically at login.
-* **🔐 Secure & Audited**: Built with security best practices, using UFW and `pkexec`.
-* **🐧 Universal**: Designed to work on various Debian-based desktop environments (GNOME, KDE, Budgie, XFCE etc.).
+- 🌐 **Live Connection Monitoring** - Active connections with country flags
+- 🚫 **One-Click Blocking** - BLOCK/UNBLOCK/CLEAR via system tray menu  
+- 🔍 **WHOIS Lookup** - Instant IP intelligence from tray menu
+- 📊 **Real-time Dashboard** - Live connections + blocked IPs
+- 🔔 **Desktop Notifications** - Visual feedback for all actions
+- 🏛️ **Dual Protection** - ipset + UFW rules (survives reboots)
+- 🚀 **Zero Config** - Autostart + systemd daemon included
 
-## 🚀 Installation (One-Liner)
-
-To install NetGuard Pro, simply copy and paste the following command into your terminal. This will download the `install.sh` script and run it with `sudo` privileges to set up all necessary components.
+## 🚀 One-Line Installation
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/rootnatty/NetGuard-Pro/refs/heads/main/install.sh | sudo bash
-curl -sSL https://raw.githubusercontent.com/rootnatty/NetGuard-Pro/refs/heads/main/install.sh | sudo bash && netguard-health
-
+curl -sSL https://raw.githubusercontent.com/rootnatty/NetGuard-Pro/main/install.sh | sudo bash
 ```
 
-Upgrading to v6.3 LTS and above 
-If you are moving from an older version of NetGuard, a "Clean Upgrade" is mandatory to ensure the new log rotation and signal handling are configured correctly.
-1. Run the Uninstaller Ensure no legacy processes or orphaned pipes remain:
-`sudo bash uninstall.sh`
-Post-Installation Verification
-After the installation completes, verify that the kernel-level blocking (ipset), the firewall (ufw), and the control pipe (FIFO) are synced and operational.
-Run the Health Check:
-`sudo netguard-health --repair`
+## ✅ Post-Install Verification
 
-Note: The --repair flag will automatically fix missing directories or misconfigured permissions discovered during the scan.
-🧪 Testing the "Sack" (Block) Functionality
-To ensure the system is working, you can perform a safe test:
+```bash
+netguard-health    # ✅ All systems green
+netguard-applet &  # 🖱️  Tray icon appears
+```
 
-* Open the UI: /usr/local/bin/netguard-applet &
- * Find a non-critical connection in the list.
- * Select 🛑 BLOCK IP.
- * Verify the block in the audit log:
-   tail -f /var/log/netguard/audit.log
+## 📋 Quick Management
 
-💡 Pro-Tip for your README
-You might want to add a "Subsystems Map" so users understand what files they are touching. You can add this table to your "Filesystem" section:
-| Path | Purpose |
-|---|---|
-| /usr/local/bin/netguard-core | The backend "Sack" engine (Bash) |
-| /usr/local/bin/netguard-applet | The UI Monitor (Python) |
-| /etc/netguard/safelist.conf | Your "Sunderland" (Trusted) IPs |
-| /var/log/netguard/ | Daily HTML Reports & Audit Logs |
+| Command | Purpose |
+|---------|---------|
+| `netguard-health` | System status check |
+| `netguard-applet` | Launch system tray |
+| `tail -f /var/log/netguard/audit.log` | Live audit trail |
 
+**Power Commands:**
+```bash
+echo "BLOCK 1.2.3.4"  | sudo tee /run/netguard/control.fifo   # Block IP
+echo "UNBLOCK 1.2.3.4" | sudo tee /run/netguard/control.fifo   # Unblock  
+echo "CLEAR"           | sudo tee /run/netguard/control.fifo   # Reset all
+```
 
+## 🏗️ System Architecture
 
- POST-DEPLOY TESTS:
-bash
-netguard-health                    # 4/4 green checks
-netguard-applet &                  # Tray appears instantly
-echo "BLOCK 1.2.3.4" | nc -U /run/netguard/control.fifo  # Logs [BLOCK]
-tail -f /var/log/netguard/audit.log # Confirm action logged
+| Path | Component |
+|------|-----------|
+| `/usr/local/bin/netguard-core` | Daemon engine (bash) |
+| `/usr/local/bin/netguard-applet` | System tray UI (python) |
+| `/run/netguard/control.fifo` | Command pipe |
+| `/var/log/netguard/audit.log` | Action log |
+| `netguard_blacklist` | ipset blacklist |
 
+## 🛡️ Tray Menu Features
 
-# ✅ CORRECT - Direct file write to FIFO
-echo "BLOCK 1.2.3.4" > /run/netguard/control.fifo
+Right-click system tray icon → 
+- **🔴 LIVE CONNECTIONS** → BLOCK | WHOIS per IP
+- **🚫 BLOCKED IPS** → UNBLOCK per IP  
+- **📋 View Audit Logs** → Live tail -f
+- **🗑️ CLEAR ALL** → Flush everything
 
-# ✅ Verify block worked
-ipset list netguard_blacklist | grep 1.2.3.4
-ufw status | grep 1.2.3.4
-tail /var/log/netguard/audit.log
+## 🔄 Upgrading (v6.3+)
 
+For clean upgrades from older versions:
+```bash
+sudo systemctl stop netguard
+sudo rm -rf /run/netguard /var/log/netguard
+# Then re-run installer
+```
 
-Quick Management Commands
-text
-netguard-health          # Status check (FIFO, service, IPSet, UFW)
-netguard-applet          # Launch tray manually (should autostart)
-sudo systemctl status netguard  # Daemon status
-tail -f /var/log/netguard/audit.log  # Live audit log
+## 🎯 Test Installation
 
-+-------------+
-Tray Applet Features (Right-click system tray icon)
-🔴 LIVE CONNECTIONS: Shows active external IPs with country flags, BLOCK/WHOIS options
-
-🚫 BLOCKED IPS: Lists blocked IPs with UNBLOCK option
-
-📋 View Audit Logs: Opens live log viewer
-
-🗑️ CLEAR ALL: Flushes all blocks
-
-Power Commands
-bash
-# Block IP
+```bash
+# 1. Safe test block
 echo "BLOCK 1.2.3.4" | sudo tee /run/netguard/control.fifo
 
-# Unblock IP  
-echo "UNBLOCK 1.2.3.4" | sudo tee /run/netguard/control.fifo
-
-# Clear everything
-echo "CLEAR" | sudo tee /run/netguard/control.fifo
-
-# Check blocked count
-ipset list netguard_blacklist 2>/dev/null | grep -c '^[0-9]' || echo 0
-Persistence & Recovery
-Systemd: Auto-restarts daemon (sudo systemctl restart netguard)
-
-Autostart: GUI launches on login via ~/.config/autostart/netguard.desktop
-
-UFW Rules: Tagged "NetGuard-Pro" for easy identification (sudo ufw status numbered)
-
-This is production-ready! The dual ipset+UFW approach ensures blocks survive reboots and service restarts.
-
+# 2. Verify
+ipset list netguard_blacklist | grep 1.2.3.4
+ufw status | grep NetGuard-Pro
+tail /var/log/netguard/audit.log
+```
