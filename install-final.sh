@@ -14,16 +14,27 @@ REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 
 echo -e "${CYAN}${BOLD}🚀 Deploying NetGuard Pro v6.3 LTS Production...${RESET}"
 
-# 1. DEPENDENCIES
-apt update -qq >/dev/null 2>&1
-# Improved package check
+# 1. DEPENDENCIES (✅ ERROR CHECKING + VERBOSE)
+echo -e "📦 Installing Core Dependencies..."
+apt update -qq || { echo "❌ apt update failed"; exit 1; }
+
 if apt-cache show gir1.2-ayatanaappindicator3-0.1 >/dev/null 2>&1; then
   APP_IND="gir1.2-ayatanaappindicator3-0.1"
 else
   APP_IND="gir1.2-appindicator3-0.1"
 fi
+
 apt install -y curl ipset ufw python3 python3-gi python3-whois "$APP_IND" \
-  gir1.2-notify-0.7 netcat-openbsd geoip-bin libnotify-bin mailutils logrotate >/dev/null 2>&1
+  gir1.2-notify-0.7 netcat-openbsd geoip-bin libnotify-bin mailutils logrotate || {
+    echo -e "${RED}❌ CRITICAL: Package installation failed${RESET}"
+    echo "Run: sudo apt install ipset"
+    exit 1
+}
+
+# ✅ VERIFY ipset works
+command -v ipset >/dev/null || { echo "❌ ipset still missing"; exit 1; }
+echo -e "${GREEN}✅ Dependencies OK${RESET}"
+
 
 # 2. PERMISSIONS & DIRECTORIES
 mkdir -p /etc/netguard /var/log/netguard /run/netguard
